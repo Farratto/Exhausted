@@ -4,12 +4,12 @@
 -- attribution and copyright information.
 --
 -- luacheck: globals onInit onTabletopInit onClose cleanExhaustionEffect sumExhaustion updateEffect
--- luacheck: globals customReduceExhaustion customRest customAddEffect customApplyDamage customParseEffect
+-- luacheck: globals customReduceExhaustion customRest customAddEffectByTable customApplyDamage customParseEffect
 -- luacheck: globals newDND customGetEffectsBonus newDNDModExhaustion customOutputResult customOnCastSave customCheckModRoll
 -- luacheck: globals customModAttack customModSave tireless customPerformAction
 -- luacheck: globals EffectsManagerExhausted is2024
 local rest = nil;
-local addEffect = nil;
+local addEffectByTable = nil;
 local applyDamage = nil;
 local parseEffects = nil;
 local reduceExhaustion = nil;
@@ -27,13 +27,13 @@ local bOneDnD = false;
 
 function onInit()
     rest = CharManager.rest;
-    addEffect = EffectManager.addEffect;
+    addEffectByTable = EffectManager.addEffectByTable;
     applyDamage = ActionDamage.applyDamage;
     parseEffects = PowerManager.parseEffects;
     reduceExhaustion = CombatManager2.reduceExhaustion;
 
     CharManager.rest = customRest;
-    EffectManager.addEffect = customAddEffect;
+    EffectManager.addEffectByTable = customAddEffectByTable;
     ActionDamage.applyDamage = customApplyDamage;
     PowerManager.parseEffects = customParseEffect;
     CombatManager2.reduceExhaustion = customReduceExhaustion;
@@ -89,7 +89,7 @@ function onTabletopInit()
 end
 
 function onClose()
-    EffectManager.addEffect = addEffect;
+    EffectManager.addEffectByTable = addEffectByTable;
     CharManager.rest = rest;
     ActionDamage.applyDamage = applyDamage;
     PowerManager.parseEffects = parseEffects;
@@ -236,22 +236,27 @@ function customRest(nodeChar, bLong)
     rest(nodeChar, bLong);
 end
 
-function customAddEffect(sUser, sIdentity, nodeCT, rNewEffect, bShowMsg)
-    if not nodeCT or not rNewEffect or not rNewEffect.sName then
-        return addEffect(sUser, sIdentity, nodeCT, rNewEffect, bShowMsg);
+function customAddEffectByTable(vActor, rEffect, ...)
+    if not vActor or not rEffect or not rEffect.sName then
+        return addEffectByTable(vActor, rEffect, ...);
     end
-    local nExhaustionLevel = EffectsManagerExhausted.cleanExhaustionEffect(sUser, sIdentity, nodeCT, rNewEffect, bShowMsg);
+    local nodeCT = ActorManager.getCTNode(vActor);
+    if not nodeCT then
+        return addEffectByTable(vActor, rEffect, ...);
+    end
+    local bShowMsg = not rEffect.bSkipAnnounce;
+    local nExhaustionLevel = EffectsManagerExhausted.cleanExhaustionEffect(rEffect.sUser, nil, nodeCT, rEffect, bShowMsg);
     -- Immune casued an empty effect so ignore
-    if rNewEffect.sName == '' then
+    if rEffect.sName == '' then
         return;
     end
     if nExhaustionLevel > 0 then
         local rActor = ActorManager.resolveActor(nodeCT);
         if not EffectsManagerExhausted.sumExhaustion(rActor, nExhaustionLevel) then
-            addEffect(sUser, sIdentity, nodeCT, rNewEffect, bShowMsg);
+            return addEffectByTable(vActor, rEffect, ...);
         end;
     else
-        addEffect(sUser, sIdentity, nodeCT, rNewEffect, bShowMsg);
+        return addEffectByTable(vActor, rEffect, ...);
     end
 end
 
